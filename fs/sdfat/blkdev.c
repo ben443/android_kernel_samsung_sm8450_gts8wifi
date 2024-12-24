@@ -180,15 +180,6 @@ s32 bdev_mread(struct super_block *sb, u64 secno, struct buffer_head **bh, u64 n
 	if (*bh)
 		return 0;
 
-	/*
-	 * patch 1.2.4 : reset ONCE warning message per volume.
-	 */
-	if (!(fsi->prev_eio & SDFAT_EIO_READ)) {
-		fsi->prev_eio |= SDFAT_EIO_READ;
-		sdfat_log_msg(sb, KERN_ERR, "%s: No bh. I/O error.", __func__);
-		sdfat_debug_warn_on(1);
-	}
-
 	return -EIO;
 }
 
@@ -234,14 +225,6 @@ s32 bdev_mwrite(struct super_block *sb, u64 secno, struct buffer_head *bh, u64 n
 	}
 	return 0;
 no_bh:
-	/*
-	 * patch 1.2.4 : reset ONCE warning message per volume.
-	 */
-	if (!(fsi->prev_eio & SDFAT_EIO_WRITE)) {
-		fsi->prev_eio |= SDFAT_EIO_WRITE;
-		sdfat_log_msg(sb, KERN_ERR, "%s: No bh. I/O error.", __func__);
-		sdfat_debug_warn_on(1);
-	}
 
 	return -EIO;
 }
