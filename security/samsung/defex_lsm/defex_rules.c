@@ -246,7 +246,6 @@
 	{feature_safeplace_path,"/apex/com.android.runtime/bin/crash_dump32"},
 	{feature_safeplace_path,"/apex/com.android.runtime/bin/crash_dump64"},
 	{feature_safeplace_path,"/system/bin/lpdump"},
-	{feature_safeplace_path,"/system/bin/extra_free_kbytes.sh"},
 	{feature_safeplace_path,"/system/bin/bpfloader"},
 	{feature_safeplace_path,"/system/bin/btfloader"},
 	{feature_safeplace_path,"/vendor/bin/system_dlkm_modprobe.sh"},
