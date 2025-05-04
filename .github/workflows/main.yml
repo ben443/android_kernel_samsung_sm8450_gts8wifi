@@ -1,0 +1,38 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch: # Allows manual triggering of the workflow
+
+jobs:
+  build:
+    name: Build Kernel
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up dependencies
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev
+
+      # Step 3: Configure the Kernel Build
+      - name: Configure Kernel
+        run: |
+          make defconfig
+
+      # Step 4: Build the Kernel
+      - name: Build Kernel
+        run: |
+          make -j$(nproc)
+
+      # Step 5: Save Build Artifacts
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: kernel-build
+          path: |
+            arch/arm64/boot # Adjust this path based on the actual kernel output directory
