@@ -11,7 +11,7 @@ jobs:
     steps:
       # Step 1: Checkout the code
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Step 2: Set up dependencies
       - name: Install Dependencies
@@ -22,16 +22,17 @@ jobs:
       # Step 3: Configure the Kernel Build
       - name: Configure Kernel
         run: |
-          make defconfig
+         ./build.sh
 
       # Step 4: Build the Kernel
       - name: Build Kernel
-        run: |
-          make -j$(nproc)
+       # run: |
+          #make -j$(nproc)
+          
 
       # Step 5: Save Build Artifacts
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-build
           path: |
