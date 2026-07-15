@@ -1,39 +1,169 @@
-name: Build Kernel
+name: Build Kernel and Modules
 
 on:
-  workflow_dispatch: # Allows manual triggering of the workflow
+  workflow_dispatch:
+    inputs:
+      defconfig:
+        description: "Kernel defconfig target (e.g. waipio-gki_defconfig)"
+        required: false
+        default: "teacaet_waipio-gki_defconfig"
+      extra_make_args:
+        description: "Extra make args (optional)"
+        required: false
+        default: ""
 
 jobs:
   build:
-    name: Build Kernel
-    runs-on: ubuntu-latest
+    name: Build kernel + modules
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    env:
+      ARCH: arm64
+      SUBARCH: arm64
+      OUT_DIR: out
+      LLVM: "1"
+      LLVM_IAS: "1"
+      CC: clang
+      CLANG_TRIPLE: aarch64-linux-gnu-
+      CROSS_COMPILE: aarch64-linux-gnu-
+      CROSS_COMPILE_COMPAT: arm-linux-gnueabi-
+      KCFLAGS: -Wno-error
+      MAKEFLAGS: -j$(nproc)
 
     steps:
-      # Step 1: Checkout the code
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # Step 2: Set up dependencies
-      - name: Install Dependencies
+      - name: Install build dependencies
         run: |
+          set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            bc bison build-essential ccache clang curl dwarves flex gcc \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git kmod libelf-dev \
+            libncurses-dev libssl-dev lld llvm lz4 pahole python3 rsync \
+            xz-utils zstd zip
 
-      # Step 3: Configure the Kernel Build
-      - name: Configure Kernel
+      - name: Print tool versions
         run: |
-         ./build.sh
+          set -euxo pipefail
+          uname -a
+          clang --version || true
+          ld.lld --version || true
+          aarch64-linux-gnu-gcc --version || true
+          arm-linux-gnueabi-gcc --version || true
+          make --version
 
-      # Step 4: Build the Kernel
-      - name: Build Kernel
-       # run: |
-          #make -j$(nproc)
-          
+      - name: Resolve defconfig
+        id: cfg
+        shell: bash
+        run: |
+          set -euo pipefail
+          INPUT_CFG="${{ github.event.inputs.defconfig }}"
+          if [[ -z "${INPUT_CFG}" ]]; then
+            INPUT_CFG="waipio-gki_defconfig"
+          fi
 
-      # Step 5: Save Build Artifacts
-      - name: Upload Build Artifacts
+          if make -s ARCH=${ARCH} O=${OUT_DIR} "${INPUT_CFG}" >/dev/null 2>&1; then
+            echo "defconfig=${INPUT_CFG}" >> "$GITHUB_OUTPUT"
+            echo "Using user-provided defconfig: ${INPUT_CFG}"
+            exit 0
+          fi
+
+          for CANDIDATE in waipio-gki_defconfig gki_defconfig defconfig; do
+            if make -s ARCH=${ARCH} O=${OUT_DIR} "${CANDIDATE}" >/dev/null 2>&1; then
+              echo "defconfig=${CANDIDATE}" >> "$GITHUB_OUTPUT"
+              echo "Using fallback defconfig: ${CANDIDATE}"
+              exit 0
+            fi
+          done
+
+          echo "ERROR: Could not find a working defconfig target." >&2
+          exit 1
+
+      - name: Configure kernel
+        run: |
+          set -euxo pipefail
+          mkdir -p "${OUT_DIR}"
+          make ARCH=${ARCH} O=${OUT_DIR} "${{ steps.cfg.outputs.defconfig }}"
+          make ARCH=${ARCH} O=${OUT_DIR} olddefconfig
+          cp "${OUT_DIR}/.config" "${OUT_DIR}/config.final"
+
+      - name: Build kernel image and modules
+        run: |
+          set -euxo pipefail
+          EXTRA_ARGS="${{ github.event.inputs.extra_make_args }}"
+          make ARCH=${ARCH} O=${OUT_DIR} \
+            LLVM=${LLVM} LLVM_IAS=${LLVM_IAS} \
+            CC=${CC} CLANG_TRIPLE=${CLANG_TRIPLE} \
+            CROSS_COMPILE=${CROSS_COMPILE} CROSS_COMPILE_COMPAT=${CROSS_COMPILE_COMPAT} \
+            KCFLAGS="${KCFLAGS}" \
+            ${EXTRA_ARGS} \
+            Image modules dtbs
+
+      - name: Install modules to staging
+        run: |
+          set -euxo pipefail
+          rm -rf module_staging
+          mkdir -p module_staging
+          make ARCH=${ARCH} O=${OUT_DIR} \
+            LLVM=${LLVM} LLVM_IAS=${LLVM_IAS} \
+            CC=${CC} CLANG_TRIPLE=${CLANG_TRIPLE} \
+            CROSS_COMPILE=${CROSS_COMPILE} CROSS_COMPILE_COMPAT=${CROSS_COMPILE_COMPAT} \
+            modules_install INSTALL_MOD_PATH="${PWD}/module_staging"
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf artifacts
+          mkdir -p artifacts/kernel artifacts/modules artifacts/meta
+
+          cp -v "${OUT_DIR}/arch/arm64/boot/Image" artifacts/kernel/ || true
+          cp -v "${OUT_DIR}/arch/arm64/boot/Image.gz" artifacts/kernel/ || true
+          cp -v "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" artifacts/kernel/ || true
+
+          shopt -s globstar nullglob
+          DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/**/*.dtb )
+          DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/**/*.dtbo )
+
+          if (( ${#DTBS[@]} > 0 )); then
+            mkdir -p artifacts/kernel/dtb
+            cp -v "${DTBS[@]}" artifacts/kernel/dtb/
+          fi
+          if (( ${#DTBOS[@]} > 0 )); then
+            mkdir -p artifacts/kernel/dtbo
+            cp -v "${DTBOS[@]}" artifacts/kernel/dtbo/
+          fi
+
+          rsync -a module_staging/ artifacts/modules/
+          cp -v "${OUT_DIR}/Module.symvers" artifacts/meta/ || true
+          cp -v "${OUT_DIR}/System.map" artifacts/meta/ || true
+          cp -v "${OUT_DIR}/vmlinux" artifacts/meta/ || true
+          cp -v "${OUT_DIR}/config.final" artifacts/meta/.config || true
+
+          {
+            echo "Repo: $GITHUB_REPOSITORY"
+            echo "SHA: $GITHUB_SHA"
+            echo "Ref: $GITHUB_REF"
+            echo "Defconfig: ${{ steps.cfg.outputs.defconfig }}"
+            echo "Build time (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > artifacts/meta/build-manifest.txt
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-build
-          path: |
-            arch/arm64/boot # Adjust this path based on the actual kernel output directory
+          name: kernel-build-${{ github.run_number }}-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Upload raw output dir (debug fallback)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-build-debug-out-${{ github.run_number }}-${{ github.sha }}
+          path: out/
+          if-no-files-found: warn
+          compression-level: 0
