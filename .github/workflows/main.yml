@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       defconfig:
-        description: "Kernel defconfig target (e.g. waipio-gki_defconfig)"
+        description: "Kernel defconfig target (e.g. gki_defconfig)"
         required: false
-        default: "teacaet_waipio-gki_defconfig"
+        default: "gki_defconfig"
       extra_make_args:
         description: "Extra make args (optional)"
         required: false
@@ -62,7 +62,7 @@ jobs:
           set -euo pipefail
           INPUT_CFG="${{ github.event.inputs.defconfig }}"
           if [[ -z "${INPUT_CFG}" ]]; then
-            INPUT_CFG="teacaet_waipio-gki_defconfig"
+            INPUT_CFG="gki_defconfig"
           fi
 
           if make -s ARCH=${ARCH} O=${OUT_DIR} "${INPUT_CFG}" >/dev/null 2>&1; then
@@ -71,7 +71,7 @@ jobs:
             exit 0
           fi
 
-          for CANDIDATE in waipio-gki_defconfig gki_defconfig defconfig; do
+          for CANDIDATE in gki_defconfig waipio-gki_defconfig defconfig; do
             if make -s ARCH=${ARCH} O=${OUT_DIR} "${CANDIDATE}" >/dev/null 2>&1; then
               echo "defconfig=${CANDIDATE}" >> "$GITHUB_OUTPUT"
               echo "Using fallback defconfig: ${CANDIDATE}"
