@@ -62,7 +62,7 @@ jobs:
           set -euo pipefail
           INPUT_CFG="${{ github.event.inputs.defconfig }}"
           if [[ -z "${INPUT_CFG}" ]]; then
-            INPUT_CFG="waipio-gki_defconfig"
+            INPUT_CFG="teacaet_waipio-gki_defconfig"
           fi
 
           if make -s ARCH=${ARCH} O=${OUT_DIR} "${INPUT_CFG}" >/dev/null 2>&1; then
