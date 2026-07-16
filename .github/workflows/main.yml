@@ -55,32 +55,9 @@ jobs:
           arm-linux-gnueabi-gcc --version || true
           make --version
 
-      - name: Resolve defconfig
-        id: cfg
-        shell: bash
-        run: |
-          set -euo pipefail
-          INPUT_CFG="${{ github.event.inputs.defconfig }}"
-          if [[ -z "${INPUT_CFG}" ]]; then
-            INPUT_CFG="gki_defconfig"
-          fi
-
-          if make -s ARCH=${ARCH} O=${OUT_DIR} "${INPUT_CFG}" >/dev/null 2>&1; then
-            echo "defconfig=${INPUT_CFG}" >> "$GITHUB_OUTPUT"
-            echo "Using user-provided defconfig: ${INPUT_CFG}"
-            exit 0
-          fi
-
-          for CANDIDATE in gki_defconfig waipio-gki_defconfig defconfig; do
-            if make -s ARCH=${ARCH} O=${OUT_DIR} "${CANDIDATE}" >/dev/null 2>&1; then
-              echo "defconfig=${CANDIDATE}" >> "$GITHUB_OUTPUT"
-              echo "Using fallback defconfig: ${CANDIDATE}"
-              exit 0
-            fi
-          done
-
-          echo "ERROR: Could not find a working defconfig target." >&2
-          exit 1
+    #  - name: Resolve defconfig
+      #  id: cfg
+        
 
       - name: Configure kernel
         run: |
