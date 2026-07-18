@@ -40,7 +40,6 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update
-          # Removed standard Ubuntu clang/gcc/llvm to force the build to use Proton-Clang
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             bc bison build-essential ccache curl dwarves flex git kmod \
             libelf-dev libncurses-dev libssl-dev lz4 pahole python3 rsync \
@@ -69,7 +68,6 @@ jobs:
         run: |
           set -euxo pipefail
           uname -a
-          # These will now output the Proton-Clang versions
           clang --version || true
           ld.lld --version || true
           aarch64-linux-gnu-gcc --version || true
@@ -115,7 +113,13 @@ jobs:
             LLVM=${LLVM} LLVM_IAS=${LLVM_IAS} \
             CC=${CC} CLANG_TRIPLE=${CLANG_TRIPLE} \
             CROSS_COMPILE=${CROSS_COMPILE} CROSS_COMPILE_COMPAT=${CROSS_COMPILE_COMPAT} \
+            INSTALL_MOD_STRIP=1 \
             modules_install INSTALL_MOD_PATH="${PWD}/module_staging"
+            
+          # CRITICAL: Remove the build/source symlinks so the artifact 
+          # uploader doesn't package the entire kernel source tree.
+          rm -f module_staging/lib/modules/*/build
+          rm -f module_staging/lib/modules/*/source
 
       - name: Collect artifacts
         shell: bash
@@ -129,8 +133,10 @@ jobs:
           cp -v "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" artifacts/kernel/ || true
 
           shopt -s globstar nullglob
-          DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/**/*.dtb )
-          DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/**/*.dtbo )
+          
+          # OPTIMIZATION: Only collect Qualcomm (qcom) DTBs
+          DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtb )
+          DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtbo )
 
           if (( ${#DTBS[@]} > 0 )); then
             mkdir -p artifacts/kernel/dtb
