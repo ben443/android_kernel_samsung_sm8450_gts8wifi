@@ -63,7 +63,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p "${OUT_DIR}"
-          make ARCH=${ARCH} O=${OUT_DIR} "${{ steps.cfg.outputs.defconfig }}"
+          make ARCH=${ARCH} O=${OUT_DIR} "${{ github.event.inputs.defconfig || 'gki_defconfig' }}"
           make ARCH=${ARCH} O=${OUT_DIR} olddefconfig
           cp "${OUT_DIR}/.config" "${OUT_DIR}/config.final"
 
@@ -124,7 +124,7 @@ jobs:
             echo "Repo: $GITHUB_REPOSITORY"
             echo "SHA: $GITHUB_SHA"
             echo "Ref: $GITHUB_REF"
-            echo "Defconfig: ${{ steps.cfg.outputs.defconfig }}"
+            echo "Defconfig: ${{ github.event.inputs.defconfig || 'gki_defconfig' }}"
             echo "Build time (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > artifacts/meta/build-manifest.txt
 
