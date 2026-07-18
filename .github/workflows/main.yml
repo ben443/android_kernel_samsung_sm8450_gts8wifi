@@ -29,37 +29,47 @@ jobs:
       CROSS_COMPILE: aarch64-linux-gnu-
       CROSS_COMPILE_COMPAT: arm-linux-gnueabi-
       KCFLAGS: -Wno-error
-      # Explicitly cap at 2 jobs to keep memory allocation stable on 7GB hosts
+      # Cap parallel jobs to prevent memory exhaustion
       MAKEFLAGS: -j2 
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install base dependencies
         run: |
           set -euxo pipefail
           sudo apt-get update
+          # Removed standard Ubuntu clang/gcc/llvm to force the build to use Proton-Clang
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            bc bison build-essential ccache clang curl dwarves flex gcc \
-            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git kmod libelf-dev \
-            libncurses-dev libssl-dev lld llvm lz4 pahole python3 rsync \
+            bc bison build-essential ccache curl dwarves flex git kmod \
+            libelf-dev libncurses-dev libssl-dev lz4 pahole python3 rsync \
             xz-utils zstd zip
 
-      # NEW STEP: Allocates 12GB of virtual memory swap to absorb Clang memory spikes
+      - name: Setup Proton-Clang Toolchain
+        run: |
+          set -euxo pipefail
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git $HOME/proton-clang
+          # Inject the toolchain into the runner's PATH for all subsequent steps
+          echo "$HOME/proton-clang/bin" >> $GITHUB_PATH
+
       - name: Configure swap space
         run: |
           set -euxo pipefail
-          sudo fallocate -l 12G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          # Provision additional swap on the runner's ephemeral SSD
+          sudo fallocate -l 12G /mnt/extra-swap
+          sudo chmod 600 /mnt/extra-swap
+          sudo mkswap /mnt/extra-swap
+          sudo swapon /mnt/extra-swap
+          
           free -h
+          swapon --show
 
       - name: Print tool versions
         run: |
           set -euxo pipefail
           uname -a
+          # These will now output the Proton-Clang versions
           clang --version || true
           ld.lld --version || true
           aarch64-linux-gnu-gcc --version || true
