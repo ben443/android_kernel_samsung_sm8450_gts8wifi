@@ -55,9 +55,15 @@ jobs:
           arm-linux-gnueabi-gcc --version || true
           make --version
 
-    #  - name: Resolve defconfig
-      #  id: cfg
-        
+      - name: Resolve defconfig
+        id: cfg
+        run: |
+          set -euxo pipefail
+          DEFCONFIG="${{ github.event.inputs.defconfig }}"
+          if [ -z "${DEFCONFIG}" ]; then
+            DEFCONFIG="gki_defconfig"
+          fi
+          echo "defconfig=${DEFCONFIG}" >> "$GITHUB_OUTPUT"
 
       - name: Configure kernel
         run: |
