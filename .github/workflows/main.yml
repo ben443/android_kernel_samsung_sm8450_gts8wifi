@@ -29,7 +29,8 @@ jobs:
       CROSS_COMPILE: aarch64-linux-gnu-
       CROSS_COMPILE_COMPAT: arm-linux-gnueabi-
       KCFLAGS: -Wno-error
-      MAKEFLAGS: -j$(nproc)
+      # Explicitly cap at 2 jobs to keep memory allocation stable on 7GB hosts
+      MAKEFLAGS: -j2 
 
     steps:
       - name: Checkout
@@ -44,6 +45,16 @@ jobs:
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git kmod libelf-dev \
             libncurses-dev libssl-dev lld llvm lz4 pahole python3 rsync \
             xz-utils zstd zip
+
+      # NEW STEP: Allocates 12GB of virtual memory swap to absorb Clang memory spikes
+      - name: Configure swap space
+        run: |
+          set -euxo pipefail
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
 
       - name: Print tool versions
         run: |
