@@ -1,4 +1,4 @@
-name: Build Kernel and Modules
+name: Build Kernel
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Build kernel + modules
+    name: Build kernel (built-in only)
     runs-on: ubuntu-22.04
     timeout-minutes: 180
 
@@ -92,7 +92,7 @@ jobs:
           make ARCH=${ARCH} O=${OUT_DIR} olddefconfig
           cp "${OUT_DIR}/.config" "${OUT_DIR}/config.final"
 
-      - name: Build kernel image and modules
+      - name: Build kernel image
         run: |
           set -euxo pipefail
           EXTRA_ARGS="${{ github.event.inputs.extra_make_args }}"
@@ -102,31 +102,14 @@ jobs:
             CROSS_COMPILE=${CROSS_COMPILE} CROSS_COMPILE_COMPAT=${CROSS_COMPILE_COMPAT} \
             KCFLAGS="${KCFLAGS}" \
             ${EXTRA_ARGS} \
-            Image modules dtbs
-
-      - name: Install modules to staging
-        run: |
-          set -euxo pipefail
-          rm -rf module_staging
-          mkdir -p module_staging
-          make ARCH=${ARCH} O=${OUT_DIR} \
-            LLVM=${LLVM} LLVM_IAS=${LLVM_IAS} \
-            CC=${CC} CLANG_TRIPLE=${CLANG_TRIPLE} \
-            CROSS_COMPILE=${CROSS_COMPILE} CROSS_COMPILE_COMPAT=${CROSS_COMPILE_COMPAT} \
-            INSTALL_MOD_STRIP=1 \
-            modules_install INSTALL_MOD_PATH="${PWD}/module_staging"
-            
-          # CRITICAL: Remove the build/source symlinks so the artifact 
-          # uploader doesn't package the entire kernel source tree.
-          rm -f module_staging/lib/modules/*/build
-          rm -f module_staging/lib/modules/*/source
+            Image dtbs
 
       - name: Collect artifacts
         shell: bash
         run: |
           set -euxo pipefail
           rm -rf artifacts
-          mkdir -p artifacts/kernel artifacts/modules artifacts/meta
+          mkdir -p artifacts/kernel artifacts/meta
 
           cp -v "${OUT_DIR}/arch/arm64/boot/Image" artifacts/kernel/ || true
           cp -v "${OUT_DIR}/arch/arm64/boot/Image.gz" artifacts/kernel/ || true
@@ -147,7 +130,6 @@ jobs:
             cp -v "${DTBOS[@]}" artifacts/kernel/dtbo/
           fi
 
-          rsync -a module_staging/ artifacts/modules/
           cp -v "${OUT_DIR}/Module.symvers" artifacts/meta/ || true
           cp -v "${OUT_DIR}/System.map" artifacts/meta/ || true
           cp -v "${OUT_DIR}/vmlinux" artifacts/meta/ || true
