@@ -123,37 +123,30 @@ jobs:
           rm -rf artifacts
           mkdir -p artifacts/kernel artifacts/meta
 
+          # Copy kernel image
           cp -v "${OUT_DIR}/arch/arm64/boot/Image" artifacts/kernel/ || true
           cp -v "${OUT_DIR}/arch/arm64/boot/Image.gz" artifacts/kernel/ || true
           cp -v "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" artifacts/kernel/ || true
 
+          # Copy device trees
+          mkdir -p artifacts/kernel/dtb
+          cp -v "${OUT_DIR}/arch/arm64/boot/dts"/*.dtb artifacts/kernel/dtb/ 2>/dev/null || true
+          cp -v "${OUT_DIR}/arch/arm64/boot/dts/qcom"/*.dtb artifacts/kernel/dtb/ 2>/dev/null || true
+
+          # Copy all kernel modules (.ko files)
           shopt -s globstar nullglob
-          
-          # Collect all kernel modules (.ko files)
           KOS=( ${OUT_DIR}/**/*.ko )
           if (( ${#KOS[@]} > 0 )); then
             mkdir -p artifacts/kernel/modules
             cp -v "${KOS[@]}" artifacts/kernel/modules/
           fi
 
-          # # OPTIMIZATION: Only collect Qualcomm (qcom) DTBs
-          # DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtb )
-          # DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtbo )
-          #
-          # if (( ${#DTBS[@]} > 0 )); then
-          #   mkdir -p artifacts/kernel/dtb
-          #   cp -v "${DTBS[@]}" artifacts/kernel/dtb/
-          # fi
-          # if (( ${#DTBOS[@]} > 0 )); then
-          #   mkdir -p artifacts/kernel/dtbo
-          #   cp -v "${DTBOS[@]}" artifacts/kernel/dtbo/
-          # fi
+          # Copy build metadata
+          cp -v "${OUT_DIR}/System.map" artifacts/meta/ 2>/dev/null || true
+          cp -v "${OUT_DIR}/Module.symvers" artifacts/meta/ 2>/dev/null || true
+          cp -v "${OUT_DIR}/.config" artifacts/meta/config || true
 
-          # cp -v "${OUT_DIR}/Module.symvers" artifacts/meta/ || true
-          # cp -v "${OUT_DIR}/System.map" artifacts/meta/ || true
-          # cp -v "${OUT_DIR}/vmlinux" artifacts/meta/ || true
-          # cp -v "${OUT_DIR}/config.final" artifacts/meta/.config || true
-
+          # Generate build manifest
           {
             echo "Repo: $GITHUB_REPOSITORY"
             echo "SHA: $GITHUB_SHA"
@@ -169,12 +162,3 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           compression-level: 6
-
-      - name: Upload raw output dir (debug fallback)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-build-debug-out-${{ github.run_number }}-${{ github.sha }}
-          path: out/
-          if-no-files-found: warn
-          compression-level: 0
