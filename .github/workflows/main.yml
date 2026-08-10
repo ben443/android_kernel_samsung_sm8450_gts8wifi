@@ -104,6 +104,18 @@ jobs:
             ${EXTRA_ARGS} \
             Image dtbs
 
+      - name: Build kernel modules
+        run: |
+          set -euxo pipefail
+          EXTRA_ARGS="${{ github.event.inputs.extra_make_args }}"
+          make ARCH=${ARCH} O=${OUT_DIR} \
+            LLVM=${LLVM} LLVM_IAS=${LLVM_IAS} \
+            CC=${CC} CLANG_TRIPLE=${CLANG_TRIPLE} \
+            CROSS_COMPILE=${CROSS_COMPILE} CROSS_COMPILE_COMPAT=${CROSS_COMPILE_COMPAT} \
+            KCFLAGS="${KCFLAGS}" \
+            ${EXTRA_ARGS} \
+            modules
+
       - name: Collect artifacts
         shell: bash
         run: |
