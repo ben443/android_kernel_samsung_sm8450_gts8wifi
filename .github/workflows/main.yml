@@ -129,23 +129,30 @@ jobs:
 
           shopt -s globstar nullglob
           
-          # OPTIMIZATION: Only collect Qualcomm (qcom) DTBs
-          DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtb )
-          DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtbo )
-
-          if (( ${#DTBS[@]} > 0 )); then
-            mkdir -p artifacts/kernel/dtb
-            cp -v "${DTBS[@]}" artifacts/kernel/dtb/
-          fi
-          if (( ${#DTBOS[@]} > 0 )); then
-            mkdir -p artifacts/kernel/dtbo
-            cp -v "${DTBOS[@]}" artifacts/kernel/dtbo/
+          # Collect all kernel modules (.ko files)
+          KOS=( ${OUT_DIR}/**/*.ko )
+          if (( ${#KOS[@]} > 0 )); then
+            mkdir -p artifacts/kernel/modules
+            cp -v "${KOS[@]}" artifacts/kernel/modules/
           fi
 
-          cp -v "${OUT_DIR}/Module.symvers" artifacts/meta/ || true
-          cp -v "${OUT_DIR}/System.map" artifacts/meta/ || true
-          cp -v "${OUT_DIR}/vmlinux" artifacts/meta/ || true
-          cp -v "${OUT_DIR}/config.final" artifacts/meta/.config || true
+          # # OPTIMIZATION: Only collect Qualcomm (qcom) DTBs
+          # DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtb )
+          # DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtbo )
+          #
+          # if (( ${#DTBS[@]} > 0 )); then
+          #   mkdir -p artifacts/kernel/dtb
+          #   cp -v "${DTBS[@]}" artifacts/kernel/dtb/
+          # fi
+          # if (( ${#DTBOS[@]} > 0 )); then
+          #   mkdir -p artifacts/kernel/dtbo
+          #   cp -v "${DTBOS[@]}" artifacts/kernel/dtbo/
+          # fi
+
+          # cp -v "${OUT_DIR}/Module.symvers" artifacts/meta/ || true
+          # cp -v "${OUT_DIR}/System.map" artifacts/meta/ || true
+          # cp -v "${OUT_DIR}/vmlinux" artifacts/meta/ || true
+          # cp -v "${OUT_DIR}/config.final" artifacts/meta/.config || true
 
           {
             echo "Repo: $GITHUB_REPOSITORY"
