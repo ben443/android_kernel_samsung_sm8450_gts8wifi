@@ -1,0 +1,137 @@
+name: 'Setup NetHunter & Wireless Drivers'
+description: 'Enable Kali NetHunter features, HID gadgets, and USB WiFi dongle drivers'
+inputs:
+  version:
+    description: 'Kernel config version (e.g., android16-6.12)'
+    required: false
+    default: 'android16-6.12'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Enable NetHunter Kernel Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          # --- Wireless Core & Injection ---
+          CONFIG_NET_CORE=y
+          CONFIG_WIRELESS=y
+          CONFIG_CFG80211=y
+          CONFIG_NL80211_TESTMODE=y
+          CONFIG_CFG80211_WEXT=y
+          CONFIG_MAC80211=y
+          CONFIG_MAC80211_MESH=y
+          CONFIG_MAC80211_LEDS=y
+          CONFIG_MAC80211_MESSAGE_TRACING=y
+
+          # --- USB Wireless Drivers (=m for modular load) ---
+          CONFIG_WLAN_VENDOR_REALTEK=y
+          CONFIG_RTW88=m
+          CONFIG_RTW88_CORE=m
+          CONFIG_RTW88_USB=m
+          CONFIG_RTW88_8822B=m
+          CONFIG_RTW88_8822C=m
+          CONFIG_RTW88_8723D=m
+          CONFIG_RTW88_8821C=m
+          CONFIG_RTW88_8822BU=m
+          CONFIG_RTW88_8822CU=m
+          CONFIG_RTW88_8723DU=m
+          CONFIG_RTW88_8821CU=m
+          CONFIG_RTL8187=m
+          CONFIG_RTL8XXXU=m
+          CONFIG_RTL8XXXU_UNTESTED=y
+
+          CONFIG_WLAN_VENDOR_ATH=y
+          CONFIG_ATH9K_HTC=m
+          CONFIG_CARL9170=m
+          CONFIG_CARL9170_LEDS=y
+          CONFIG_CARL9170_WPC=y
+
+          CONFIG_WLAN_VENDOR_RALINK=y
+          CONFIG_RT2X00=m
+          CONFIG_RT2800USB=m
+          CONFIG_RT2800USB_RT33XX=y
+          CONFIG_RT2800USB_RT35XX=y
+          CONFIG_RT2800USB_RT3573=y
+          CONFIG_RT2800USB_RT53XX=y
+          CONFIG_RT2800USB_RT55XX=y
+
+          CONFIG_WLAN_VENDOR_MEDIATEK=y
+          CONFIG_MT7601U=m
+          CONFIG_MT76_CORE=m
+          CONFIG_MT76_USB=m
+          CONFIG_MT76x02_LIB=m
+          CONFIG_MT76x02_USB=m
+          CONFIG_MT76x0U=m
+          CONFIG_MT76x2_COMMON=m
+          CONFIG_MT76x2U=m
+
+          # --- USB HID Gadgets (BadUSB / Rubber Ducky) ---
+          CONFIG_USB_CONFIGFS_F_FS=y
+          CONFIG_USB_CONFIGFS_F_HID=y
+          CONFIG_USB_F_HID=y
+
+          # --- USB Ethernet & Network Dongles ---
+          CONFIG_USB_NET_DRIVERS=y
+          CONFIG_USB_USBNET=y
+          CONFIG_USB_NET_AX8817X=y
+          CONFIG_USB_NET_AX88179_178A=y
+          CONFIG_USB_NET_CDCETHER=y
+          CONFIG_USB_NET_CDC_NCM=y
+          CONFIG_USB_NET_RTL8152=y
+          CONFIG_USB_NET_RTL8150=y
+
+          # --- Bluetooth RFCOMM & USB ---
+          CONFIG_BT_RFCOMM=y
+          CONFIG_BT_RFCOMM_TTY=y
+          CONFIG_BT_BNEP=y
+          CONFIG_BT_HIDP=y
+          CONFIG_BT_HCIBTUSB=m
+
+          # --- SDR (Software Defined Radio) ---
+          CONFIG_MEDIA_SUPPORT=y
+          CONFIG_MEDIA_USB_SUPPORT=y
+          CONFIG_DVB_USB_RTL28XXU=m
+
+    - name: Register Wireless Modules in Bazel modules.bzl
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        if [ -f "modules.bzl" ]; then
+          echo "Updating modules.bzl with NetHunter wireless drivers..."
+          cat << 'BAZEL_EOF' >> modules.bzl
+
+# NetHunter Wireless Drivers
+_NETHUNTER_MODULES = [
+    "drivers/net/wireless/realtek/rtw88/rtw88_core.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_usb.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_8822b.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_8822c.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_8822bu.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_8822cu.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_8723d.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_8723du.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_8821c.ko",
+    "drivers/net/wireless/realtek/rtw88/rtw88_8821cu.ko",
+    "drivers/net/wireless/realtek/rtl8xxxu/rtl8xxxu.ko",
+    "drivers/net/wireless/realtek/rtl818x/rtl8187/rtl8187.ko",
+    "drivers/net/wireless/ath/ath9k/ath9k_htc.ko",
+    "drivers/net/wireless/ath/carl9170/carl9170.ko",
+    "drivers/net/wireless/ralink/rt2x00/rt2x00lib.ko",
+    "drivers/net/wireless/ralink/rt2x00/rt2x00usb.ko",
+    "drivers/net/wireless/ralink/rt2x00/rt2800lib.ko",
+    "drivers/net/wireless/ralink/rt2x00/rt2800usb.ko",
+    "drivers/net/wireless/mediatek/mt76/mt76.ko",
+    "drivers/net/wireless/mediatek/mt76/mt76-usb.ko",
+    "drivers/net/wireless/mediatek/mt76/mt7601u.ko",
+    "drivers/net/wireless/mediatek/mt76/mt76x02-lib.ko",
+    "drivers/net/wireless/mediatek/mt76/mt76x02-usb.ko",
+    "drivers/net/wireless/mediatek/mt76/mt76x0-common.ko",
+    "drivers/net/wireless/mediatek/mt76/mt76x0u.ko",
+    "drivers/net/wireless/mediatek/mt76/mt76x2-common.ko",
+    "drivers/net/wireless/mediatek/mt76/mt76x2u.ko",
+    "drivers/bluetooth/btusb.ko",
+]
+BAZEL_EOF
+        fi
