@@ -6,7 +6,7 @@ on:
       defconfig:
         description: "Kernel defconfig target (e.g. gki_defconfig)"
         required: false
-        default: "gki_defconfig"
+        default: "gki_defconfig droidian.config"
       extra_make_args:
         description: "Extra make args (optional)"
         required: false
